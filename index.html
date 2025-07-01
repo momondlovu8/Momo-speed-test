@@ -1,0 +1,197 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Momo Speed App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    .container {
+      background-color: #111;
+      padding: 30px;
+      border-radius: 20px;
+      box-shadow: 0 0 25px rgba(0,0,0,0.5);
+      text-align: center;
+      width: 100%;
+      max-width: 500px;
+    }
+
+    h1 {
+      font-size: 30px;
+      margin-bottom: 10px;
+    }
+
+    button {
+      margin: 10px 5px;
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
+      border-radius: 10px;
+      background-color: #00c6ff;
+      color: white;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #007acc;
+    }
+
+    #results {
+      margin-top: 20px;
+      font-size: 16px;
+    }
+
+    canvas {
+      margin-top: 30px;
+      background-color: #222;
+      border-radius: 15px;
+      padding: 10px;
+    }
+
+    .timestamp {
+      font-size: 12px;
+      color: #ccc;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Momo Speed App</h1>
+    <p>Test your internet speed visually</p>
+    <button onclick="startTest()">Start Test</button>
+    <button onclick="resetResults()">Reset</button>
+
+    <div id="results">
+      <p><strong>Download:</strong> <span id="download">--</span> Mbps</p>
+      <p><strong>Upload:</strong> <span id="upload">--</span> Mbps</p>
+      <p><strong>Ping:</strong> <span id="ping">--</span> ms</p>
+      <p><strong>Connection:</strong> <span id="type">--</span></p>
+    </div>
+
+    <canvas id="speedChart" width="400" height="300"></canvas>
+    <div class="timestamp" id="timestamp"></div>
+  </div>
+
+  <script>
+    let chart;
+
+    function startTest() {
+      resetResults();
+      testDownloadSpeed().then(downloadMbps => {
+        document.getElementById('download').innerText = downloadMbps;
+        testUploadSpeed().then(uploadMbps => {
+          document.getElementById('upload').innerText = uploadMbps;
+          testPing().then(ping => {
+            document.getElementById('ping').innerText = ping;
+            updateConnectionInfo();
+            document.getElementById('timestamp').innerText =
+              "Test completed at: " + new Date().toLocaleTimeString();
+
+            updateChart(downloadMbps, uploadMbps, ping);
+          });
+        });
+      });
+    }
+
+    function resetResults() {
+      document.getElementById('download').innerText = '--';
+      document.getElementById('upload').innerText = '--';
+      document.getElementById('ping').innerText = '--';
+      document.getElementById('type').innerText = '--';
+      document.getElementById('timestamp').innerText = '';
+      if (chart) {
+        chart.data.datasets[0].data = [0, 0, 0];
+        chart.update();
+      }
+    }
+
+    function testDownloadSpeed() {
+      const fileSizeMB = 5;
+      const url = 'https://speed.hetzner.de/5MB.bin';
+      const start = new Date().getTime();
+
+      return fetch(url)
+        .then(res => res.blob())
+        .then(() => {
+          const end = new Date().getTime();
+          const duration = (end - start) / 1000;
+          const bitsLoaded = fileSizeMB * 8 * 1024 * 1024;
+          return (bitsLoaded / duration / 1024 / 1024).toFixed(2);
+        });
+    }
+
+    function testUploadSpeed() {
+      const data = new Blob(['0'.repeat(500000)]);
+      const start = new Date().getTime();
+
+      return fetch('https://postman-echo.com/post', {
+        method: 'POST',
+        body: data
+      })
+        .then(() => {
+          const end = new Date().getTime();
+          const duration = (end - start) / 1000;
+          const bitsSent = 0.5 * 8 * 1024 * 1024;
+          return (bitsSent / duration / 1024 / 1024).toFixed(2);
+        });
+    }
+
+    function testPing() {
+      const start = new Date().getTime();
+      return fetch('https://www.google.com/', { mode: 'no-cors' })
+        .then(() => {
+          const end = new Date().getTime();
+          return end - start;
+        })
+        .catch(() => 999);
+    }
+
+    function updateConnectionInfo() {
+      const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      const type = conn ? conn.effectiveType : "Unknown";
+      document.getElementById('type').innerText = type;
+    }
+
+    function updateChart(download, upload, ping) {
+      if (!chart) {
+        const ctx = document.getElementById('speedChart').getContext('2d');
+        chart = new Chart(ctx, {
+          type: 'bar',
+          data: {
+            labels: ['Download (Mbps)', 'Upload (Mbps)', 'Ping (ms)'],
+            datasets: [{
+              label: 'Speed Test Results',
+              data: [download, upload, ping],
+              backgroundColor: ['#00c6ff', '#00ff99', '#ff6f61'],
+              borderRadius: 8
+            }]
+          },
+          options: {
+            scales: {
+              y: {
+                beginAtZero: true
+              }
+            }
+          }
+        });
+      } else {
+        chart.data.datasets[0].data = [download, upload, ping];
+        chart.update();
+      }
+    }
+  </script>
+</body>
+</html>
